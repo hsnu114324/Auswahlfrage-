@@ -151,6 +151,75 @@
     .option-btn.disabled { cursor: default; opacity: .7; }
     .option-btn.disabled.correct { opacity: 1; }
 
+    .option-pair {
+      font-size: .8rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* ── Typing area ── */
+    .typing-area {
+      margin-top: 20px;
+      display: none;
+      text-align: center;
+    }
+    .typing-area.show { display: block; }
+    .typing-label {
+      font-size: .9rem;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+    .typing-row {
+      display: flex;
+      gap: 8px;
+    }
+    .typing-input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      font-size: 1.1rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .typing-input:focus { border-color: var(--primary); }
+    .typing-input.input-correct { border-color: var(--correct); background: var(--correct-bg); }
+    .typing-input.input-wrong { border-color: var(--wrong); background: var(--wrong-bg); }
+    .typing-submit {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+      white-space: nowrap;
+    }
+    .typing-submit:hover { background: var(--primary-hover); }
+    .typing-submit:disabled { opacity: .5; cursor: default; }
+    .typing-feedback {
+      margin-top: 8px;
+      font-size: .9rem;
+      font-weight: 600;
+      min-height: 1.4em;
+    }
+    .typing-feedback.fb-correct { color: var(--correct); }
+    .typing-feedback.fb-wrong { color: var(--wrong); }
+
+    .score-badge {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-size: .8rem;
+      font-weight: 700;
+    }
+    .score-badge.full { background: var(--correct-bg); color: var(--correct); }
+    .score-badge.half { background: #fef9c3; color: #a16207; }
+    .score-badge.zero { background: var(--wrong-bg); color: var(--wrong); }
+
     /* ── Next button ── */
     .next-btn {
       margin-top: 22px;
@@ -259,6 +328,14 @@
     <div class="card-label" id="cardLabel">請選出正確的德文</div>
     <div class="card-word" id="cardWord">—</div>
     <div class="options" id="optionsEl"></div>
+    <div class="typing-area" id="typingArea">
+      <div class="typing-label" id="typingLabel">請輸入正確的德文單字：</div>
+      <div class="typing-row">
+        <input type="text" class="typing-input" id="typingInput" autocomplete="off" spellcheck="false">
+        <button class="typing-submit" id="typingSubmit">確認</button>
+      </div>
+      <div class="typing-feedback" id="typingFeedback"></div>
+    </div>
     <button class="next-btn" id="nextBtn">下一題</button>
   </div>
 
@@ -575,6 +652,8 @@ let questions = [];
 let current = 0;
 let score = 0;
 let answered = false;
+let typingPhase = false;  // true = waiting for user to type German
+let typingDone = false;   // true = typing already submitted
 
 const $ = id => document.getElementById(id);
 
@@ -593,12 +672,18 @@ function buildQuestions() {
   current = 0;
   score = 0;
   answered = false;
+  typingPhase = false;
+  typingDone = false;
 }
 
 function pickDistractors(correctIdx) {
   const others = VOCAB.filter((_, i) => i !== correctIdx);
   shuffle(others);
   return others.slice(0, 3);
+}
+
+function formatScore(s) {
+  return Number.isInteger(s) ? s : s.toFixed(1);
 }
 
 function render() {
@@ -609,7 +694,7 @@ function render() {
   const total = questions.length;
   $("progressText").textContent = `${current + 1} / ${total}`;
   $("progressFill").style.width = `${((current) / total) * 100}%`;
-  $("scoreText").textContent = `${score} 分`;
+  $("scoreText").textContent = `${formatScore(score)} / ${total * 1}`;
 
   const [de, zh] = questions[current];
   const correctVocabIdx = VOCAB.findIndex(v => v[0] === de && v[1] === zh);
@@ -638,7 +723,25 @@ function render() {
   });
 
   $("nextBtn").classList.remove("show");
+  $("typingArea").classList.remove("show");
+  $("typingInput").value = "";
+  $("typingInput").className = "typing-input";
+  $("typingFeedback").textContent = "";
+  $("typingFeedback").className = "typing-feedback";
+  $("typingSubmit").disabled = false;
   answered = false;
+  typingPhase = false;
+  typingDone = false;
+}
+
+function revealAllPairs() {
+  const allBtns = $("optionsEl").querySelectorAll(".option-btn");
+  allBtns.forEach(b => {
+    const pair = document.createElement("div");
+    pair.className = "option-pair";
+    pair.textContent = `${b.dataset.de}  =  ${b.dataset.zh}`;
+    b.appendChild(pair);
+  });
 }
 
 function handleAnswer(btn, correctDe, correctZh) {
@@ -646,7 +749,6 @@ function handleAnswer(btn, correctDe, correctZh) {
   answered = true;
 
   const isCorrect = btn.dataset.de === correctDe && btn.dataset.zh === correctZh;
-  if (isCorrect) score++;
 
   const allBtns = $("optionsEl").querySelectorAll(".option-btn");
   allBtns.forEach(b => {
@@ -655,14 +757,56 @@ function handleAnswer(btn, correctDe, correctZh) {
       b.classList.add("correct");
     }
   });
-  if (!isCorrect) btn.classList.add("wrong");
 
-  $("scoreText").textContent = `${score} 分`;
+  if (isCorrect) {
+    // Phase 1 done: MC correct → reveal all pairs + show typing input
+    revealAllPairs();
+    score += 0.5;
+    $("scoreText").textContent = `${formatScore(score)} / ${questions.length}`;
+    typingPhase = true;
 
+    $("typingArea").classList.add("show");
+    $("typingLabel").textContent = `請輸入正確的德文單字：`;
+    setTimeout(() => $("typingInput").focus(), 50);
+  } else {
+    // Wrong answer: show correct, reveal pairs, 0 points
+    btn.classList.add("wrong");
+    revealAllPairs();
+    showNextOrResult();
+  }
+}
+
+function handleTypingSubmit() {
+  if (!typingPhase || typingDone) return;
+  typingDone = true;
+
+  const [correctDe] = questions[current];
+  const userInput = $("typingInput").value.trim();
+  const isMatch = userInput === correctDe;
+
+  $("typingSubmit").disabled = true;
+
+  if (isMatch) {
+    $("typingInput").classList.add("input-correct");
+    $("typingFeedback").textContent = "正確！獲得完整 1 分";
+    $("typingFeedback").classList.add("fb-correct");
+    score += 0.5;
+  } else {
+    $("typingInput").classList.add("input-wrong");
+    $("typingFeedback").innerHTML = `正確答案：<strong>${correctDe}</strong>（獲得 0.5 分）`;
+    $("typingFeedback").classList.add("fb-wrong");
+  }
+
+  $("scoreText").textContent = `${formatScore(score)} / ${questions.length}`;
+  typingPhase = false;
+  showNextOrResult();
+}
+
+function showNextOrResult() {
   if (current < questions.length - 1) {
     $("nextBtn").classList.add("show");
   } else {
-    setTimeout(showResult, 600);
+    setTimeout(showResult, 800);
   }
 }
 
@@ -670,9 +814,10 @@ function showResult() {
   $("quizCard").style.display = "none";
   $("progressArea").style.display = "none";
   $("resultEl").style.display = "";
-  const pct = Math.round((score / questions.length) * 100);
+  const maxScore = questions.length;
+  const pct = Math.round((score / maxScore) * 100);
   $("finalScore").textContent = `${pct}%`;
-  $("finalDetail").textContent = `共 ${questions.length} 題，答對 ${score} 題`;
+  $("finalDetail").textContent = `共 ${questions.length} 題，得到 ${formatScore(score)} / ${maxScore} 分`;
   $("progressFill").style.width = "100%";
 }
 
@@ -704,10 +849,21 @@ $("nextBtn").addEventListener("click", () => {
 
 $("restartBtn").addEventListener("click", start);
 
+$("typingSubmit").addEventListener("click", handleTypingSubmit);
+$("typingInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); handleTypingSubmit(); }
+});
+
 /* ── Keyboard shortcut ── */
 document.addEventListener("keydown", e => {
-  if (e.key === "Enter" && !answered) return;
-  if (e.key === "Enter" && answered && current < questions.length - 1) {
+  // If typing input is focused, don't trigger number shortcuts
+  if (document.activeElement === $("typingInput")) return;
+
+  if (e.key === "Enter" && typingPhase && !typingDone) {
+    handleTypingSubmit();
+    return;
+  }
+  if (e.key === "Enter" && answered && !typingPhase && current < questions.length - 1) {
     current++;
     render();
     return;
