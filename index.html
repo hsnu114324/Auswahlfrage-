@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>德語字彙測驗</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0f2f5;
+      --card: #ffffff;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --correct: #16a34a;
+      --correct-bg: #dcfce7;
+      --wrong: #dc2626;
+      --wrong-bg: #fee2e2;
+      --text: #1e293b;
+      --text-secondary: #64748b;
+      --border: #e2e8f0;
+      --shadow: 0 4px 24px rgba(0,0,0,.08);
+      --radius: 14px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      width: 100%;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      color: #fff;
+      text-align: center;
+      padding: 32px 16px 28px;
+      position: relative;
+    }
+    header h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: .5px; }
+    header p { margin-top: 6px; font-size: .95rem; opacity: .85; }
+
+    .container {
+      width: 100%;
+      max-width: 560px;
+      padding: 24px 16px 48px;
+    }
+
+    /* ── Mode selector ── */
+    .mode-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .mode-btn {
+      flex: 1;
+      padding: 12px 0;
+      border: 2px solid var(--primary);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--primary);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .mode-btn.active,
+    .mode-btn:hover {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    /* ── Progress ── */
+    .progress-area {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      font-size: .9rem;
+      color: var(--text-secondary);
+    }
+    .progress-track {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      margin: 0 14px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 3px;
+      transition: width .4s ease;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 36px 28px 28px;
+      text-align: center;
+    }
+    .card-label {
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+    .card-word {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 28px;
+      line-height: 1.3;
+      word-break: break-word;
+    }
+
+    /* ── Options ── */
+    .options { display: flex; flex-direction: column; gap: 10px; }
+    .option-btn {
+      width: 100%;
+      padding: 14px 18px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      font-size: 1.05rem;
+      cursor: pointer;
+      transition: all .15s;
+      text-align: left;
+      color: var(--text);
+    }
+    .option-btn:hover:not(.disabled) {
+      border-color: var(--primary);
+      background: #eef2ff;
+    }
+    .option-btn.correct {
+      border-color: var(--correct);
+      background: var(--correct-bg);
+      font-weight: 600;
+    }
+    .option-btn.wrong {
+      border-color: var(--wrong);
+      background: var(--wrong-bg);
+    }
+    .option-btn.disabled { cursor: default; opacity: .7; }
+    .option-btn.disabled.correct { opacity: 1; }
+
+    /* ── Next button ── */
+    .next-btn {
+      margin-top: 22px;
+      padding: 13px 0;
+      width: 100%;
+      border: none;
+      border-radius: 10px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 1.05rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: none;
+      transition: background .2s;
+    }
+    .next-btn:hover { background: var(--primary-hover); }
+    .next-btn.show { display: block; }
+
+    /* ── Result ── */
+    .result {
+      text-align: center;
+      padding: 48px 20px;
+    }
+    .result-icon { font-size: 4rem; margin-bottom: 16px; }
+    .result h2 { font-size: 1.6rem; margin-bottom: 8px; }
+    .result .score { font-size: 3rem; font-weight: 800; color: var(--primary); margin: 12px 0; }
+    .result p { color: var(--text-secondary); margin-bottom: 28px; }
+    .restart-btn {
+      padding: 14px 48px;
+      border: none;
+      border-radius: 10px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 1.05rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .restart-btn:hover { background: var(--primary-hover); }
+
+    /* ── Settings row ── */
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      font-size: .9rem;
+      color: var(--text-secondary);
+    }
+    .settings-row label { font-weight: 500; }
+    .settings-row select {
+      padding: 6px 12px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: .9rem;
+      background: #fff;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      header { padding: 24px 12px 20px; }
+      header h1 { font-size: 1.35rem; }
+      .card { padding: 28px 18px 22px; }
+      .card-word { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>德語字彙測驗</h1>
+  <p>中翻德 ／ 德翻中 選擇題練習</p>
+</header>
+
+<div class="container">
+  <!-- Mode -->
+  <div class="mode-bar">
+    <button class="mode-btn active" data-mode="zh2de">中文 → 德文</button>
+    <button class="mode-btn" data-mode="de2zh">德文 → 中文</button>
+  </div>
+
+  <!-- Settings -->
+  <div class="settings-row">
+    <label for="qcount">題數：</label>
+    <select id="qcount">
+      <option value="10">10 題</option>
+      <option value="20" selected>20 題</option>
+      <option value="30">30 題</option>
+      <option value="50">50 題</option>
+      <option value="0">全部</option>
+    </select>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-area" id="progressArea">
+    <span id="progressText">1 / 20</span>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <span id="scoreText">0 分</span>
+  </div>
+
+  <!-- Quiz card -->
+  <div id="quizCard" class="card">
+    <div class="card-label" id="cardLabel">請選出正確的德文</div>
+    <div class="card-word" id="cardWord">—</div>
+    <div class="options" id="optionsEl"></div>
+    <button class="next-btn" id="nextBtn">下一題</button>
+  </div>
+
+  <!-- Result -->
+  <div id="resultEl" class="card result" style="display:none;">
+    <div class="result-icon">🎉</div>
+    <h2>測驗完成！</h2>
+    <div class="score" id="finalScore">0%</div>
+    <p id="finalDetail"></p>
+    <button class="restart-btn" id="restartBtn">再來一次</button>
+  </div>
+</div>
+
+<script>
+const VOCAB = [
+  ["deshalb","因此"],
+  ["gehen","去"],
+  ["damit","為了"],
+  ["geht","去"],
+  ["Aussage","聲明 陳述"],
+  ["lange","長"],
+  ["während","在……期間"],
+  ["wegen","因為 由於"],
+  ["darauf","在上面"],
+  ["nehmen","拿走它"],
+  ["dafür","為了它"],
+  ["dort","那裡"],
+  ["denen","那些"],
+  ["darüber","關於它"],
+  ["obwohl","雖然"],
+  ["wen","誰"],
+  ["gemacht","製造"],
+  ["wohin","去哪裡"],
+  ["Touristen","遊客"],
+  ["gehört","屬於"],
+  ["Reiseleiter","導遊"],
+  ["bleiben","停留"],
+  ["besuchen","參觀"],
+  ["Flughafen","機場"],
+  ["ganz","完全地"],
+  ["trotzdem","然而"],
+  ["waren","是 sein 過去式"],
+  ["lassen","讓"],
+  ["wäre","would be"],
+  ["gegangen","走了"],
+  ["komme","來"],
+  ["konnten","可能"],
+  ["leid","悲傷、遺憾"],
+  ["wissen","知道"],
+  ["worden","變成"],
+  ["wurde","變成"],
+  ["Tisch","桌子"],
+  ["daran","在那上面"],
+  ["davon","從那裡、關於那個、其中"],
+  ["gefällt","喜歡"],
+  ["gerne","喜歡"],
+  ["gleich","一樣 馬上、立刻"],
+  ["nachdem","在...之後"],
+  ["neuen","新的"],
+  ["sondern","而是"],
+  ["entweder","不是……就是……"],
+  ["leben","活著"],
+  ["steht","站立"],
+  ["Flug","飛行"],
+  ["meisten","大多數"],
+  ["weder","既不 既不……也不……"],
+  ["deren","他們的"],
+  ["dessen","誰的"],
+  ["kannst","可以"],
+  ["Welt","世界"],
+  ["gerade","只是"],
+  ["jeder","每個人"],
+  ["krank","生病"],
+  ["meinem","我的"],
+  ["je","越多"],
+  ["darum","因此"],
+  ["dazu","到那"],
+  ["desto","更多"],
+  ["dürfen","可能"],
+  ["Familie","家庭"],
+  ["Flugzeug","飛機"],
+  ["Freundin","女朋友"],
+  ["Geburtstag","生日"],
+  ["Insel","島嶼"],
+  ["Lehrer","老師"],
+  ["Woche","週"],
+  ["woher","從哪裡來"],
+  ["zeigen","演出"],
+  ["bezahlen","支付"],
+  ["letzten","最後"],
+  ["werde","成為"],
+  ["Angestellte","員工"],
+  ["fahre","開車"],
+  ["Gast","客人"],
+  ["geworden","成為"],
+  ["vergessen","被遺忘"],
+  ["Dank","謝謝"],
+  ["früher","早些時候"],
+  ["gegenüber","相反的 對面"],
+  ["Wetter","天氣"],
+  ["dabei","因此 此外"],
+  ["erst","首先 只有 才"],
+  ["folgenden","跟隨"],
+  ["gar","甚至"],
+  ["nächsten","下一個"],
+  ["sowohl","兩者 既...又..."],
+  ["jeden","每個"],
+  ["jedes","每一個"],
+  ["konnte","能夠、可以"],
+  ["Preis","價格"],
+  ["sicher","確定"],
+  ["sofort","立即"],
+  ["sollte","應該"],
+  ["Sommer","夏天"],
+  ["stehen","站立"],
+  ["trotz","儘管"],
+  ["Wochen","幾週"],
+  ["Antwort","回答"],
+  ["bestellen","訂購"],
+  ["bringen","帶來"],
+  ["Junge","男孩"],
+  ["neben","旁邊"],
+  ["Schwester","姊姊"],
+  ["weniger","少"],
+  ["wohl","可能 大概"],
+  ["wurden","變成 成為"],
+  ["zwar","的確"],
+  ["bevor","在…之前"],
+  ["ersten","首先"],
+  ["fast","幾乎"],
+  ["finde","找到 覺得"],
+  ["fragt","詢問"],
+  ["ganzen","全部"],
+  ["Gäste","客人們"],
+  ["hatten","有"],
+  ["Kellner","服務生"],
+  ["Nähe","接近"],
+  ["nie","從不"],
+  ["Personen","人"],
+  ["Polizei","警察"],
+  ["reisen","旅行"],
+  ["schöne","美麗的、好的"],
+  ["sei","是"],
+  ["wenig","少的"],
+  ["zwischen","之間"],
+  ["Ausland","國外"],
+  ["brauchen","需要"],
+  ["Fisch","魚"],
+  ["rauchen","煙"],
+  ["schlecht","壞的"],
+  ["Schule","學校"],
+  ["sonst","否則 不然"],
+  ["schwer","困難"],
+  ["Schweiz","瑞士"],
+  ["Verkäufer","賣家"],
+  ["weiter","下一個"],
+  ["bald","很快"],
+  ["buchen","預訂"],
+  ["gefallen","喜歡"],
+  ["kennen","知道"],
+  ["korrekt","正確的"],
+  ["kostet","費用"],
+  ["nächste","下一個"],
+  ["Österreich","奧地利"],
+  ["Reiseführer","旅遊指南"],
+  ["reserviert","已預訂"],
+  ["ruhig","安靜地"],
+  ["schreiben","寫"],
+  ["seid","是"],
+  ["selbst","你自己"],
+  ["treffen","遇見"],
+  ["wessen","誰的"],
+  ["allein","獨自一人"],
+  ["allen","所有人、所有的"],
+  ["aufgrund","因為 由於"],
+  ["bekommt","獲得 得到"],
+  ["Besucher","訪客"],
+  ["Bücher","書籍"],
+  ["freue","快樂"],
+  ["Gepäck","行李"],
+  ["gesund","健康"],
+  ["Kindern","孩子"],
+  ["kommst","來"],
+  ["länger","更長"],
+  ["Schalter","櫃檯"],
+  ["Tasche","包包"],
+  ["Tochter","女兒"],
+  ["wichtig","重要的"],
+  ["zurück","回來"],
+  ["bestellt","訂購的"],
+  ["Bundesrepublik","聯邦共和國"],
+  ["deswegen","因此"],
+  ["gegeben","給予"],
+  ["genau","確切地"],
+  ["geöffnet","打開"],
+  ["geschlossen","關閉"],
+  ["Gesundheit","健康"],
+  ["kam","來"],
+  ["Kreditkarte","信用卡"],
+  ["Liebe","愛"],
+  ["Platz","地方"],
+  ["sieht","看起來"],
+  ["sitzen","坐"],
+  ["verloren","遺失"],
+  ["wechseln","找零"],
+  ["willst","想要"],
+  ["wofür","為了什麼"],
+  ["woran","什麼"],
+  ["Apotheke","藥局"],
+  ["Berliner","柏林人"],
+  ["daher","因此"],
+  ["Deutscher","德國人"],
+  ["empfehlen","推薦"],
+  ["erreichen","到達"],
+  ["Ferien","假期"],
+  ["Frage","問題"],
+  ["frei","免費的"],
+  ["gewesen","已經"],
+  ["Glück","運氣"],
+  ["Hauptbahnhof","中央車站"],
+  ["Hilfe","幫助"],
+  ["hoch","高"],
+  ["hören","聽"],
+  ["Kaufhaus","百貨公司"],
+  ["laufen","跑"],
+  ["laut","大聲"],
+  ["legen","放"],
+  ["Millionen","數百萬"],
+  ["mitnehmen","帶上"],
+  ["Schloss","城堡"],
+  ["Sonne","太陽"],
+  ["spricht","說話"],
+  ["stark","強烈地"],
+  ["stellen","放置 擺放"],
+  ["Unfall","意外事故"],
+  ["verlassen","離開"],
+  ["alten","舊的"],
+  ["aufs","在…上面"],
+  ["bereits","已經"],
+  ["besteht","存在"],
+  ["Bibliothek","圖書館"],
+  ["Brief","信"],
+  ["danach","之後"],
+  ["denken","思考"],
+  ["erhalten","收到"],
+  ["fliegen","飛行"],
+  ["Frauen","女性"],
+  ["früh","早"],
+  ["genießen","享受"],
+  ["genommen","拿走"],
+  ["geschrieben","寫"],
+  ["gutes","好"],
+  ["kaum","幾乎沒有"],
+  ["Meinung","意見"],
+  ["Nacht","夜晚"],
+  ["Monate","幾個月"],
+  ["pünktlich","準時"],
+  ["reservieren","預訂"],
+  ["schlafen","睡眠"],
+  ["Teil","部分"],
+  ["Tempel","寺廟"],
+  ["überhaupt","根本、究竟、總之"],
+  ["Verkäuferin","女售貨員"],
+  ["zahlen","付錢"],
+  ["zuerst","首先"],
+  ["bekannt","知道"],
+  ["chinesische","中國人"],
+  ["dadurch","因此"],
+  ["entlang","沿著"],
+  ["erzählt","告訴"],
+  ["etwa","大約"],
+  ["Fall","案件"],
+  ["fest","確定 節日"],
+  ["Formular","形式"],
+  ["Führerschein","駕駛執照"],
+  ["gearbeitet","工作過的"],
+  ["Geschenk","禮物"],
+  ["getrunken","醉酒的"],
+  ["gilt","有效的"],
+  ["gleiche","相同的"],
+  ["höchste","最高的"],
+  ["hört","聽到的"],
+  ["interessieren","興趣"],
+  ["Jungen","男孩們"],
+  ["kenne","知道"],
+  ["Kopfschmerzen","頭痛"],
+  ["Ländern","國家"],
+  ["lang","長的"],
+  ["Mauer","牆"],
+  ["Mitarbeiter","員工"],
+  ["Namen","名字"],
+  ["nun","現在"],
+  ["Ordnung","秩序"],
+  ["Palastmuseum","國立故宮博物院"],
+  ["Passkontrolle","護照檢查"],
+  ["reparieren","維修"],
+  ["schönen","美麗的"],
+  ["Sehenswürdigkeiten","景點"],
+  ["später","稍後"],
+  ["Sport","運動"],
+  ["Stelle","位置"],
+  ["stellt","提供"],
+  ["Tagen","天"],
+  ["Tür","門"],
+  ["Unterkunft","住宿"],
+  ["verstehen","了解"],
+  ["Winter","冬季"],
+  ["zufrieden","滿意"]
+];
+
+let mode = "zh2de";
+let totalQ = 20;
+let questions = [];
+let current = 0;
+let score = 0;
+let answered = false;
+
+const $ = id => document.getElementById(id);
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function buildQuestions() {
+  const pool = shuffle([...VOCAB]);
+  const count = totalQ === 0 ? pool.length : Math.min(totalQ, pool.length);
+  questions = pool.slice(0, count);
+  current = 0;
+  score = 0;
+  answered = false;
+}
+
+function pickDistractors(correctIdx) {
+  const others = VOCAB.filter((_, i) => i !== correctIdx);
+  shuffle(others);
+  return others.slice(0, 3);
+}
+
+function render() {
+  $("resultEl").style.display = "none";
+  $("quizCard").style.display = "";
+  $("progressArea").style.display = "";
+
+  const total = questions.length;
+  $("progressText").textContent = `${current + 1} / ${total}`;
+  $("progressFill").style.width = `${((current) / total) * 100}%`;
+  $("scoreText").textContent = `${score} 分`;
+
+  const [de, zh] = questions[current];
+  const correctVocabIdx = VOCAB.findIndex(v => v[0] === de && v[1] === zh);
+
+  if (mode === "zh2de") {
+    $("cardLabel").textContent = "請選出正確的德文";
+    $("cardWord").textContent = zh;
+  } else {
+    $("cardLabel").textContent = "請選出正確的中文";
+    $("cardWord").textContent = de;
+  }
+
+  const distractors = pickDistractors(correctVocabIdx);
+  const optionData = shuffle([questions[current], ...distractors]);
+
+  const optionsEl = $("optionsEl");
+  optionsEl.innerHTML = "";
+  optionData.forEach(([ode, ozh]) => {
+    const btn = document.createElement("button");
+    btn.className = "option-btn";
+    btn.textContent = mode === "zh2de" ? ode : ozh;
+    btn.dataset.de = ode;
+    btn.dataset.zh = ozh;
+    btn.addEventListener("click", () => handleAnswer(btn, de, zh));
+    optionsEl.appendChild(btn);
+  });
+
+  $("nextBtn").classList.remove("show");
+  answered = false;
+}
+
+function handleAnswer(btn, correctDe, correctZh) {
+  if (answered) return;
+  answered = true;
+
+  const isCorrect = btn.dataset.de === correctDe && btn.dataset.zh === correctZh;
+  if (isCorrect) score++;
+
+  const allBtns = $("optionsEl").querySelectorAll(".option-btn");
+  allBtns.forEach(b => {
+    b.classList.add("disabled");
+    if (b.dataset.de === correctDe && b.dataset.zh === correctZh) {
+      b.classList.add("correct");
+    }
+  });
+  if (!isCorrect) btn.classList.add("wrong");
+
+  $("scoreText").textContent = `${score} 分`;
+
+  if (current < questions.length - 1) {
+    $("nextBtn").classList.add("show");
+  } else {
+    setTimeout(showResult, 600);
+  }
+}
+
+function showResult() {
+  $("quizCard").style.display = "none";
+  $("progressArea").style.display = "none";
+  $("resultEl").style.display = "";
+  const pct = Math.round((score / questions.length) * 100);
+  $("finalScore").textContent = `${pct}%`;
+  $("finalDetail").textContent = `共 ${questions.length} 題，答對 ${score} 題`;
+  $("progressFill").style.width = "100%";
+}
+
+function start() {
+  buildQuestions();
+  render();
+}
+
+/* ── Event listeners ── */
+
+document.querySelectorAll(".mode-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".mode-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    mode = btn.dataset.mode;
+    start();
+  });
+});
+
+$("qcount").addEventListener("change", e => {
+  totalQ = parseInt(e.target.value, 10);
+  start();
+});
+
+$("nextBtn").addEventListener("click", () => {
+  current++;
+  render();
+});
+
+$("restartBtn").addEventListener("click", start);
+
+/* ── Keyboard shortcut ── */
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !answered) return;
+  if (e.key === "Enter" && answered && current < questions.length - 1) {
+    current++;
+    render();
+    return;
+  }
+  const num = parseInt(e.key, 10);
+  if (num >= 1 && num <= 4 && !answered) {
+    const btns = $("optionsEl").querySelectorAll(".option-btn");
+    if (btns[num - 1]) btns[num - 1].click();
+  }
+});
+
+start();
+</script>
+</body>
+</html>
